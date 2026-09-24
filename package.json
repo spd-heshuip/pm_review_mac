@@ -11,6 +11,7 @@
     "build:ui": "vite build",
     "dev": "vite --host 127.0.0.1 --port 1420",
     "tauri": "npm run build:bridge && PM_REVIEW_BRIDGE_ENTRY=\"$PWD/dist/bridge/server.js\" tauri",
+    "pack:dmg:arm64": "PM_REVIEW_TARGET_ARCH=arm64 npm run tauri build -- --target aarch64-apple-darwin --bundles dmg",
     "test": "vitest run"
   },
   "keywords": [],

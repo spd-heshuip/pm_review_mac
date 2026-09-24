@@ -1,5 +1,8 @@
 node_modules/
 dist/
 dist-ui/
+bundle-resources/
+.toolchain/
+release/
 src-tauri/target/
 .DS_Store

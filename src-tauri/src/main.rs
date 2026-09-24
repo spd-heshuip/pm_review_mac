@@ -45,15 +45,38 @@ fn main() {
     });
 }
 
+fn app_resources_dir() -> Option<PathBuf> {
+    let executable = std::env::current_exe().ok()?;
+    let resources = executable.parent()?.parent()?.join("Resources");
+    resources
+        .join("dist/bridge/server.js")
+        .is_file()
+        .then_some(resources)
+}
+
 fn bridge_entry() -> Result<PathBuf, std::io::Error> {
+    if let Some(resources) = app_resources_dir() {
+        return Ok(resources.join("dist/bridge/server.js"));
+    }
     std::env::var("PM_REVIEW_BRIDGE_ENTRY")
         .map(PathBuf::from)
         .map_err(|_| std::io::Error::other("PM_REVIEW_BRIDGE_ENTRY is not configured"))
 }
 
+fn node_program() -> PathBuf {
+    if let Some(resources) = app_resources_dir() {
+        let bundled = resources.join("node/bin/node");
+        if bundled.is_file() {
+            return bundled;
+        }
+    }
+    PathBuf::from("node")
+}
+
 fn start_bridge(entry: PathBuf, bridge_token: &str) -> Result<(Child, u16), String> {
-    let mut child = Command::new("node")
-        .arg(entry)
+    let node = node_program();
+    let mut child = Command::new(&node)
+        .arg(&entry)
         .env("PM_REVIEW_BRIDGE_TOKEN", bridge_token)
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
