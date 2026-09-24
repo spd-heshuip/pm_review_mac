@@ -1,0 +1,11 @@
+import { describe, expect, it } from "vitest";
+import { renderReport } from "./reportView.js";
+
+describe("renderReport", () => {
+  it("builds a table of contents from headings", () => {
+    const view = renderReport("# 标题\n\n## 一、审查结论\n\n可开发\n\n## 二、完善建议\n");
+    expect(view.toc.map((item) => item.text)).toEqual(["一、审查结论", "二、完善建议"]);
+    expect(view.html).toContain("可开发");
+    expect(view.html).not.toContain("<script");
+  });
+});

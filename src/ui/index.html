@@ -4,8 +4,67 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>需求审查</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <h1>需求审查</h1>
+    <section id="settings" hidden>
+      <div class="settings-card">
+        <span class="eyebrow">首次使用</span>
+        <h1>连接 Cursor Cloud Agent</h1>
+        <p>API Key 只会保存到这台 Mac 的系统钥匙串。</p>
+        <form id="settings-form">
+          <label for="api-key">Cursor API Key</label>
+          <div class="inline-form">
+            <input id="api-key" name="api-key" type="password" autocomplete="off" required />
+            <button type="submit">保存并开始</button>
+          </div>
+          <p class="form-message" id="settings-message" role="alert"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="composer" hidden>
+      <header>
+        <div>
+          <span class="eyebrow">LesPark · 产品需求</span>
+          <h1>需求审查</h1>
+        </div>
+        <span class="connection-state">Cloud Agent 已连接</span>
+      </header>
+      <form id="composer-form">
+        <label for="requirement-id">需求 ID</label>
+        <input id="requirement-id" name="requirementId" type="text" placeholder="例如：112233" />
+
+        <label for="tapd-url">TAPD 链接</label>
+        <input id="tapd-url" name="tapdUrl" type="url" placeholder="https://www.tapd.cn/..." />
+
+        <label for="notes">补充说明</label>
+        <textarea
+          id="notes"
+          name="notes"
+          rows="6"
+          placeholder="可粘贴 PRD、验收标准，或填写功能名、页面、入口。也可注明：我在写 PRD，先看线上现状 / PRD 已写完，做审查"
+        ></textarea>
+
+        <label for="images">截图</label>
+        <input id="images" name="images" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple />
+
+        <button type="submit">提交审查</button>
+        <p class="form-message" id="composer-message" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="detail" hidden>
+      <div class="detail-heading">
+        <div>
+          <span class="eyebrow">审查记录</span>
+          <h2>最近任务</h2>
+        </div>
+        <span id="task-count"></span>
+      </div>
+      <div id="task-list"></div>
+    </section>
+
+    <script type="module" src="./main.ts"></script>
   </body>
 </html>

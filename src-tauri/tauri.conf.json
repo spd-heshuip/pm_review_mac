@@ -3,19 +3,13 @@
   "version": "0.1.0",
   "identifier": "com.lespark.pm-review",
   "build": {
-    "frontendDist": "../src/ui",
+    "frontendDist": "../dist-ui",
     "devUrl": "http://127.0.0.1:1420",
-    "beforeDevCommand": ""
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build:ui"
   },
   "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "需求审查",
-        "width": 1100,
-        "height": 760
-      }
-    ],
+    "windows": [],
     "security": { "csp": null }
   },
   "bundle": {

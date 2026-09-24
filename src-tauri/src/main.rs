@@ -1,48 +1,72 @@
-fn key_args(subcommand: &str, extra: &[&str]) -> Vec<String> {
-    let mut args = vec![
-        subcommand.into(),
-        "-a".into(),
-        "pm-review".into(),
-        "-s".into(),
-        "cursor-api-key".into(),
-    ];
-    args.extend(extra.iter().map(|item| (*item).to_string()));
-    args
-}
+use std::{
+    io::{BufRead, BufReader},
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    sync::Mutex,
+};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
-fn security(args: &[String]) -> Result<std::process::Output, String> {
-    std::process::Command::new("security")
-        .args(args)
-        .output()
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn get_api_key() -> Result<Option<String>, String> {
-    let output = security(&key_args("find-generic-password", &["-w"]))?;
-    if !output.status.success() {
-        return Ok(None);
-    }
-    let key = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok(if key.is_empty() { None } else { Some(key) })
-}
-
-#[tauri::command]
-fn set_api_key(key: String) -> Result<(), String> {
-    let mut args = key_args("add-generic-password", &["-w"]);
-    args.push(key);
-    args.push("-U".into());
-    let output = security(&args)?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
-    }
-}
+struct BridgeProcess(Mutex<Option<Child>>);
 
 fn main() {
-    tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![get_api_key, set_api_key])
-        .run(tauri::generate_context!())
-        .expect("error while running pm-review");
+    let app = tauri::Builder::default()
+        .setup(|app| {
+            let (bridge, port) = start_bridge(bridge_entry()?)
+                .map_err(|error| std::io::Error::other(format!("failed to start node bridge: {error}")))?;
+            app.manage(BridgeProcess(Mutex::new(Some(bridge))));
+            WebviewWindowBuilder::new(
+                app,
+                "main",
+                WebviewUrl::App(format!("index.html?bridge={port}").into()),
+            )
+            .title("需求审查")
+            .inner_size(1100.0, 760.0)
+            .build()?;
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building pm-review");
+
+    app.run(|handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            if let Some(mut child) = handle
+                .state::<BridgeProcess>()
+                .0
+                .lock()
+                .expect("bridge lock poisoned")
+                .take()
+            {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    });
+}
+
+fn bridge_entry() -> Result<PathBuf, std::io::Error> {
+    std::env::var("PM_REVIEW_BRIDGE_ENTRY")
+        .map(PathBuf::from)
+        .map_err(|_| std::io::Error::other("PM_REVIEW_BRIDGE_ENTRY is not configured"))
+}
+
+fn start_bridge(entry: PathBuf) -> Result<(Child, u16), String> {
+    let mut child = Command::new("node")
+        .arg(entry)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|error| error.to_string())?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "node bridge stdout is unavailable".to_string())?;
+    let mut line = String::new();
+    BufReader::new(stdout)
+        .read_line(&mut line)
+        .map_err(|error| error.to_string())?;
+    let port = line
+        .trim()
+        .parse::<u16>()
+        .map_err(|_| format!("node bridge returned an invalid port: {line}"))?;
+    Ok((child, port))
 }

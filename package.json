@@ -6,6 +6,11 @@
     "node": ">=22"
   },
   "scripts": {
+    "build": "npm run build:bridge && npm run build:ui",
+    "build:bridge": "tsc",
+    "build:ui": "vite build",
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "tauri": "npm run build:bridge && PM_REVIEW_BRIDGE_ENTRY=\"$PWD/dist/bridge/server.js\" tauri",
     "test": "vitest run"
   },
   "keywords": [],
@@ -14,11 +19,14 @@
   "description": "",
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.5",
+    "@types/node": "^26.6.2",
     "typescript": "^7.0.2",
+    "vite": "^7.3.6",
     "vitest": "^3.2.7"
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.32",
-    "@tauri-apps/api": "^2.11.1"
+    "@tauri-apps/api": "^2.11.1",
+    "marked": "^18.0.14"
   }
 }
