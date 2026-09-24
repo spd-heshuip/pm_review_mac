@@ -114,6 +114,66 @@ describe("ReviewApp", () => {
     expect(settled.reportPath).toBeNull();
   });
 
+  it("does not save a report when cancel happens during readArtifact", async () => {
+    let resolveArtifact: (value: Uint8Array) => void = () => undefined;
+    let artifactStarted: () => void = () => undefined;
+    const artifactStartedPromise = new Promise<void>((resolve) => {
+      artifactStarted = resolve;
+    });
+    const pendingArtifact = new Promise<Uint8Array>((resolve) => {
+      resolveArtifact = resolve;
+    });
+    const dir = mkdtempSync(join(tmpdir(), "pm-review-app-"));
+    const files = new Map<string, string>();
+    let saveCalls = 0;
+    const review = new ReviewApp({
+      store: TaskStore.open(join(dir, "tasks.sqlite")),
+      secrets: { getApiKey: async () => "cursor_test", setApiKey: async () => undefined },
+      gateway: {
+        async start() {
+          return {
+            agentId: "bc-1",
+            runId: "run-1",
+            terminal: Promise.resolve(
+              terminal({
+                readArtifact: async () => {
+                  artifactStarted();
+                  return pendingArtifact;
+                },
+              }),
+            ),
+          };
+        },
+        async followUp() {
+          return { runId: "run-2", terminal: Promise.resolve(terminal()) };
+        },
+        async reattach() {
+          return { runId: "run-1", terminal: Promise.resolve(terminal()) };
+        },
+        async cancel() {
+          // may resolve immediately
+        },
+      },
+      files: {
+        save: async (_taskId, fileName, bytes) => {
+          saveCalls += 1;
+          const path = join(dir, fileName);
+          files.set(path, new TextDecoder().decode(bytes));
+          return path;
+        },
+        read: async (path) => files.get(path) ?? "",
+      },
+    });
+    const task = await review.submit({ requirementId: "9", tapdUrl: "", notes: "" }, []);
+    await artifactStartedPromise;
+    await review.cancel(task.id);
+    resolveArtifact(new TextEncoder().encode("# 审查\n\n结论"));
+    const settled = await review.settle(task.id);
+    expect(saveCalls).toBe(0);
+    expect(settled.status).toBe("cancelled");
+    expect(settled.reportPath).toBeNull();
+  });
+
   it("does not download a report when terminal finishes while cancel is still pending", async () => {
     let resolveTerminal: (value: RunTerminal) => void = () => undefined;
     let releaseCancel: () => void = () => undefined;

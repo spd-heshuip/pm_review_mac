@@ -151,6 +151,7 @@ export class ReviewApp {
         const picked = pickReport(terminal.artifacts, latest.requirementId);
         if (picked) {
           const bytes = await terminal.readArtifact(picked.path);
+          if (this.mustGet(taskId).status === "cancelled") return;
           const fileName = picked.path.split("/").pop() || `${taskId}.md`;
           reportPath = await this.deps.files.save(taskId, fileName, bytes);
         }
