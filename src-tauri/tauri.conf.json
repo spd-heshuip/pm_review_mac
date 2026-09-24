@@ -1,0 +1,31 @@
+{
+  "productName": "需求审查",
+  "version": "0.1.0",
+  "identifier": "com.lespark.pm-review",
+  "build": {
+    "frontendDist": "../src/ui",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeDevCommand": ""
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "需求审查",
+        "width": 1100,
+        "height": 760
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

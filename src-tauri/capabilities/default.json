@@ -1,0 +1,5 @@
+{
+  "identifier": "default",
+  "windows": ["main"],
+  "permissions": ["core:default", "allow-get-api-key", "allow-set-api-key"]
+}
