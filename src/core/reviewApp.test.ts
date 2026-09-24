@@ -96,6 +96,61 @@ describe("ReviewApp", () => {
     expect(settled.status).toBe("completed");
   });
 
+  it("marks a restored task failed when reattach rejects and restores it only once", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pm-review-app-"));
+    const store = TaskStore.open(join(dir, "tasks.sqlite"));
+    const now = new Date().toISOString();
+    store.insert({
+      id: "restored-task",
+      title: "112233",
+      requirementId: "112233",
+      tapdUrl: "",
+      notes: "",
+      status: "running",
+      agentId: "bc-restored",
+      runId: "run-restored",
+      assistantText: "",
+      reportPath: null,
+      branchWarning: null,
+      errorMessage: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    let reattachCalls = 0;
+    const review = new ReviewApp({
+      store,
+      secrets: { getApiKey: async () => "cursor_test", setApiKey: async () => undefined },
+      gateway: {
+        async start() {
+          throw new Error("not used");
+        },
+        async followUp() {
+          throw new Error("not used");
+        },
+        async reattach() {
+          reattachCalls += 1;
+          throw new Error("恢复连接失败");
+        },
+        async cancel() {
+          throw new Error("not used");
+        },
+      },
+      files: {
+        save: async () => "",
+        read: async () => "",
+      },
+    });
+
+    review.restoreRunning();
+    review.restoreRunning();
+
+    await expect(review.settle("restored-task")).resolves.toMatchObject({
+      status: "failed",
+      errorMessage: "恢复连接失败",
+    });
+    expect(reattachCalls).toBe(1);
+  });
+
   it("cancels a running task without downloading a report", async () => {
     let resolveTerminal: (value: RunTerminal) => void = () => undefined;
     const pending = new Promise<RunTerminal>((resolve) => {

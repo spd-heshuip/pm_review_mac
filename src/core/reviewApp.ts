@@ -131,9 +131,23 @@ export class ReviewApp {
   restoreRunning(): void {
     for (const task of this.deps.store.list()) {
       if (task.status !== "running" || !task.agentId || !task.runId) continue;
+      if (this.pending.has(task.id)) continue;
       const agentId = task.agentId;
       const runId = task.runId;
-      this.pending.set(task.id, this.deps.gateway.reattach(agentId, runId).then((started) => this.finish(task.id, started.terminal)));
+      this.pending.set(task.id, this.restore(task.id, agentId, runId));
+    }
+  }
+
+  private async restore(taskId: string, agentId: string, runId: string): Promise<void> {
+    try {
+      const started = await this.deps.gateway.reattach(agentId, runId);
+      await this.finish(taskId, started.terminal);
+    } catch (error) {
+      if (this.mustGet(taskId).status === "cancelled") return;
+      this.deps.store.update(taskId, {
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : "恢复任务失败",
+      });
     }
   }
 

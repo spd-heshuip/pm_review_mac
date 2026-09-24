@@ -24,9 +24,12 @@ const composerForm = element<HTMLFormElement>("composer-form");
 const taskList = element<HTMLElement>("task-list");
 const taskCount = element<HTMLElement>("task-count");
 let refreshGeneration = 0;
-const startTaskPolling = createTaskPolling(
+const taskCards = new Map<string, { updatedAt: string; status: TaskRecord["status"]; card: HTMLElement }>();
+const reportMarkdown = new Map<string, string>();
+const updateTaskPolling = createTaskPolling(
   refreshTasks,
   (callback, delay) => window.setInterval(callback, delay),
+  (interval) => window.clearInterval(interval as number),
 );
 
 settingsForm.addEventListener("submit", async (event) => {
@@ -41,7 +44,6 @@ settingsForm.addEventListener("submit", async (event) => {
     keyInput.value = "";
     showWorkspace();
     await refreshTasks();
-    startTaskPolling();
   } catch (error) {
     setMessage("settings-message", errorMessage(error));
   } finally {
@@ -67,11 +69,11 @@ composerForm.addEventListener("submit", async (event) => {
   setMessage("composer-message", "");
   try {
     const images = await Promise.all(files.map(readImage));
-    await api("/api/tasks", {
+    const submitted = await api<TaskRecord>("/api/tasks", {
       method: "POST",
       body: JSON.stringify({ requirementId, tapdUrl, notes, images }),
     });
-    composerForm.reset();
+    if (submitted.status !== "failed") composerForm.reset();
     await refreshTasks();
   } catch (error) {
     setMessage("composer-message", errorMessage(error));
@@ -89,7 +91,6 @@ async function start(): Promise<void> {
     }
     showWorkspace();
     await refreshTasks();
-    startTaskPolling();
   } catch (error) {
     settings.hidden = false;
     setMessage("settings-message", errorMessage(error));
@@ -107,24 +108,43 @@ async function refreshTasks(): Promise<void> {
   try {
     const tasks = await api<TaskRecord[]>("/api/tasks");
     if (generation !== refreshGeneration) return;
+    updateTaskPolling(tasks.some((task) => task.status === "running"));
     taskCount.textContent = `${tasks.length} 条`;
-    taskList.replaceChildren();
     if (tasks.length === 0) {
+      taskCards.clear();
       const empty = document.createElement("div");
       empty.className = "empty-state";
       empty.textContent = "提交第一条需求后，审查进度和报告会显示在这里。";
-      taskList.append(empty);
+      taskList.replaceChildren(empty);
       return;
     }
-    for (const task of tasks) taskList.append(await createTaskCard(task));
+    const drafts = new Map(
+      Array.from(taskList.querySelectorAll<HTMLTextAreaElement>("textarea[data-task-id]"))
+        .map((textarea) => [textarea.dataset.taskId ?? "", textarea.value]),
+    );
+    const nextCards = new Map<string, { updatedAt: string; status: TaskRecord["status"]; card: HTMLElement }>();
+    const cards: HTMLElement[] = [];
+    for (const task of tasks) {
+      if (task.status !== "completed") reportMarkdown.delete(task.id);
+      const cached = taskCards.get(task.id);
+      const card = cached?.updatedAt === task.updatedAt && cached.status === task.status
+        ? cached.card
+        : await createTaskCard(task, drafts.get(task.id) ?? "");
+      nextCards.set(task.id, { updatedAt: task.updatedAt, status: task.status, card });
+      cards.push(card);
+    }
+    taskCards.clear();
+    for (const [taskId, cached] of nextCards) taskCards.set(taskId, cached);
+    taskList.replaceChildren(...cards);
   } catch (error) {
     setMessage("composer-message", errorMessage(error));
   }
 }
 
-async function createTaskCard(task: TaskRecord): Promise<HTMLElement> {
+async function createTaskCard(task: TaskRecord, followUpDraft = ""): Promise<HTMLElement> {
   const card = document.createElement("article");
   card.className = `task-card status-${task.status}`;
+  card.dataset.taskId = task.id;
 
   const header = document.createElement("div");
   header.className = "task-header";
@@ -142,11 +162,17 @@ async function createTaskCard(task: TaskRecord): Promise<HTMLElement> {
 
   if (task.branchWarning) card.append(messageBlock(task.branchWarning, "warning"));
   if (task.errorMessage) card.append(messageBlock(task.errorMessage, "error"));
+  if (task.assistantText && ["needs_input", "missing_report", "failed", "completed"].includes(task.status)) {
+    card.append(messageBlock(task.assistantText, "assistant-text"));
+  }
 
   if (task.status === "completed") {
-    if (task.assistantText) card.append(messageBlock(task.assistantText, "assistant-text"));
     try {
-      const markdown = await apiText(`/api/tasks/${encodeURIComponent(task.id)}/report`);
+      let markdown = reportMarkdown.get(task.id);
+      if (markdown === undefined) {
+        markdown = await apiText(`/api/tasks/${encodeURIComponent(task.id)}/report`);
+        reportMarkdown.set(task.id, markdown);
+      }
       card.append(createReport(markdown, task));
     } catch (error) {
       card.append(messageBlock(errorMessage(error), "error"));
@@ -166,6 +192,8 @@ async function createTaskCard(task: TaskRecord): Promise<HTMLElement> {
     const followUp = document.createElement("textarea");
     followUp.rows = 2;
     followUp.placeholder = "补充范围、入口或验收标准";
+    followUp.dataset.taskId = task.id;
+    followUp.value = followUpDraft;
     const send = actionButton("补充并继续", async () => {
       const text = followUp.value.trim();
       if (!text) return;
