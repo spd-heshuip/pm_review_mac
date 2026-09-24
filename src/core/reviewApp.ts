@@ -111,8 +111,15 @@ export class ReviewApp {
   async cancel(taskId: string): Promise<TaskRecord> {
     const task = this.mustGet(taskId);
     if (task.status !== "running" || !task.agentId || !task.runId) return task;
-    await this.deps.gateway.cancel(task.agentId, task.runId);
     this.deps.store.update(taskId, { status: "cancelled" });
+    try {
+      await this.deps.gateway.cancel(task.agentId, task.runId);
+    } catch (error) {
+      this.deps.store.update(taskId, {
+        status: "cancelled",
+        errorMessage: error instanceof Error ? error.message : "取消失败",
+      });
+    }
     return this.mustGet(taskId);
   }
 
@@ -135,12 +142,12 @@ export class ReviewApp {
     if (current.status === "cancelled") return;
     try {
       const terminal = await terminalPromise;
-      const latest = this.mustGet(taskId);
-      if (latest.status === "cancelled") return;
+      if (this.mustGet(taskId).status === "cancelled") return;
       const failed = terminal.status === "error";
       const cancelled = terminal.status === "cancelled";
       let reportPath: string | null = null;
       if (!failed && !cancelled) {
+        const latest = this.mustGet(taskId);
         const picked = pickReport(terminal.artifacts, latest.requirementId);
         if (picked) {
           const bytes = await terminal.readArtifact(picked.path);
@@ -148,6 +155,7 @@ export class ReviewApp {
           reportPath = await this.deps.files.save(taskId, fileName, bytes);
         }
       }
+      if (this.mustGet(taskId).status === "cancelled") return;
       const cursorBranch = terminal.gitBranches.find((branch) => branch.startsWith("cursor/"));
       this.deps.store.update(taskId, {
         status: resolveStatus({ cancelled, failed, reportPath, assistantText: terminal.assistantText }),
@@ -157,6 +165,7 @@ export class ReviewApp {
         errorMessage: failed ? terminal.assistantText || "本轮执行失败" : null,
       });
     } catch (error) {
+      if (this.mustGet(taskId).status === "cancelled") return;
       this.deps.store.update(taskId, {
         status: "failed",
         errorMessage: error instanceof Error ? error.message : "本轮执行失败",

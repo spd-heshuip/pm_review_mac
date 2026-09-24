@@ -113,4 +113,66 @@ describe("ReviewApp", () => {
     expect(settled.status).toBe("cancelled");
     expect(settled.reportPath).toBeNull();
   });
+
+  it("does not download a report when terminal finishes while cancel is still pending", async () => {
+    let resolveTerminal: (value: RunTerminal) => void = () => undefined;
+    let releaseCancel: () => void = () => undefined;
+    const pendingTerminal = new Promise<RunTerminal>((resolve) => {
+      resolveTerminal = resolve;
+    });
+    const pendingCancel = new Promise<void>((resolve) => {
+      releaseCancel = resolve;
+    });
+    const seen = { prompts: [] as string[], cancelled: false, resumed: [] as string[] };
+    const dir = mkdtempSync(join(tmpdir(), "pm-review-app-"));
+    const files = new Map<string, string>();
+    let readArtifactCalls = 0;
+    let saveCalls = 0;
+    const review = new ReviewApp({
+      store: TaskStore.open(join(dir, "tasks.sqlite")),
+      secrets: { getApiKey: async () => "cursor_test", setApiKey: async () => undefined },
+      gateway: {
+        async start() {
+          return { agentId: "bc-1", runId: "run-1", terminal: pendingTerminal };
+        },
+        async followUp() {
+          return { runId: "run-2", terminal: pendingTerminal };
+        },
+        async reattach() {
+          return { runId: "run-1", terminal: pendingTerminal };
+        },
+        async cancel() {
+          seen.cancelled = true;
+          await pendingCancel;
+        },
+      },
+      files: {
+        save: async (_taskId, fileName, bytes) => {
+          saveCalls += 1;
+          const path = join(dir, fileName);
+          files.set(path, new TextDecoder().decode(bytes));
+          return path;
+        },
+        read: async (path) => files.get(path) ?? "",
+      },
+    });
+    const task = await review.submit({ requirementId: "9", tapdUrl: "", notes: "" }, []);
+    const cancelPromise = review.cancel(task.id);
+    resolveTerminal(
+      terminal({
+        readArtifact: async () => {
+          readArtifactCalls += 1;
+          return new TextEncoder().encode("# 审查\n\n结论");
+        },
+      }),
+    );
+    await review.settle(task.id);
+    expect(readArtifactCalls).toBe(0);
+    expect(saveCalls).toBe(0);
+    releaseCancel();
+    await cancelPromise;
+    const cancelled = review.list().find((item) => item.id === task.id)!;
+    expect(cancelled.status).toBe("cancelled");
+    expect(cancelled.reportPath).toBeNull();
+  });
 });
