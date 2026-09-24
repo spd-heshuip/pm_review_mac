@@ -1,5 +1,6 @@
 import { renderReport } from "../core/reportView.js";
 import type { TaskRecord } from "../core/taskStore.js";
+import { createTaskPolling } from "./taskPolling.js";
 
 const statusLabels: Record<TaskRecord["status"], string> = {
   running: "进行中",
@@ -11,7 +12,8 @@ const statusLabels: Record<TaskRecord["status"], string> = {
 };
 
 const bridgePort = new URLSearchParams(window.location.search).get("bridge");
-if (!bridgePort) throw new Error("未找到本地桥接服务");
+const bridgeToken = new URLSearchParams(window.location.search).get("token") ?? "";
+if (!bridgePort || !bridgeToken) throw new Error("未找到本地桥接服务");
 const apiBase = `http://127.0.0.1:${bridgePort}`;
 
 const settings = element<HTMLElement>("settings");
@@ -22,6 +24,10 @@ const composerForm = element<HTMLFormElement>("composer-form");
 const taskList = element<HTMLElement>("task-list");
 const taskCount = element<HTMLElement>("task-count");
 let refreshGeneration = 0;
+const startTaskPolling = createTaskPolling(
+  refreshTasks,
+  (callback, delay) => window.setInterval(callback, delay),
+);
 
 settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -35,6 +41,7 @@ settingsForm.addEventListener("submit", async (event) => {
     keyInput.value = "";
     showWorkspace();
     await refreshTasks();
+    startTaskPolling();
   } catch (error) {
     setMessage("settings-message", errorMessage(error));
   } finally {
@@ -82,7 +89,7 @@ async function start(): Promise<void> {
     }
     showWorkspace();
     await refreshTasks();
-    window.setInterval(() => void refreshTasks(), 3_000);
+    startTaskPolling();
   } catch (error) {
     settings.hidden = false;
     setMessage("settings-message", errorMessage(error));
@@ -264,7 +271,7 @@ function downloadMarkdown(markdown: string, task: TaskRecord): void {
 }
 
 async function api<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
   });
@@ -273,9 +280,15 @@ async function api<T = unknown>(path: string, options: RequestInit = {}): Promis
 }
 
 async function apiText(path: string): Promise<string> {
-  const response = await fetch(`${apiBase}${path}`);
+  const response = await fetch(apiUrl(path));
   if (!response.ok) throw new Error(await responseError(response));
   return response.text();
+}
+
+function apiUrl(path: string): string {
+  const url = new URL(path, apiBase);
+  url.searchParams.set("token", bridgeToken);
+  return url.toString();
 }
 
 async function responseError(response: Response): Promise<string> {

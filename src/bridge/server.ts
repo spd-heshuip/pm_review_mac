@@ -8,6 +8,7 @@ import { CursorGateway } from "../core/cursorGateway.js";
 import type { ImageAttachment } from "../core/input.js";
 import { ReviewApp, type AgentGateway, type ReportFiles, type SecretStore } from "../core/reviewApp.js";
 import { TaskStore } from "../core/taskStore.js";
+import { allowedCorsOrigin, hasValidBridgeToken } from "./security.js";
 
 const execFileAsync = promisify(execFile);
 const keychainAccount = "pm-review";
@@ -15,6 +16,8 @@ const keychainService = "cursor-api-key";
 const dataDirectory =
   process.env.PM_REVIEW_DATA_DIR ?? join(homedir(), "Library", "Application Support", "pm-review");
 const reportsDirectory = join(dataDirectory, "reports");
+const bridgeToken = process.env.PM_REVIEW_BRIDGE_TOKEN;
+if (!bridgeToken) throw new Error("PM_REVIEW_BRIDGE_TOKEN is not configured");
 
 await mkdir(reportsDirectory, { recursive: true });
 
@@ -84,14 +87,24 @@ const app = new ReviewApp({
 if (apiKey) app.restoreRunning();
 
 const server = createServer(async (request, response) => {
-  setCorsHeaders(response);
+  const requestUrl = request.url ?? "/";
+  if (!hasValidBridgeToken(requestUrl, bridgeToken)) {
+    sendJson(response, 401, { error: "未授权访问" });
+    return;
+  }
+  const corsOrigin = allowedCorsOrigin(request.headers.origin);
+  if (request.headers.origin && !corsOrigin) {
+    sendJson(response, 403, { error: "不允许的请求来源" });
+    return;
+  }
+  setCorsHeaders(response, corsOrigin);
   if (request.method === "OPTIONS") {
     response.writeHead(204).end();
     return;
   }
 
   try {
-    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const url = new URL(requestUrl, "http://127.0.0.1");
     const path = url.pathname;
 
     if (request.method === "GET" && path === "/api/session") {
@@ -165,8 +178,9 @@ server.listen(0, "127.0.0.1", () => {
   process.stdout.write(`${address.port}\n`);
 });
 
-function setCorsHeaders(response: ServerResponse): void {
-  response.setHeader("Access-Control-Allow-Origin", "*");
+function setCorsHeaders(response: ServerResponse, origin: string | null): void {
+  if (origin) response.setHeader("Access-Control-Allow-Origin", origin);
+  response.setHeader("Vary", "Origin");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type");
   response.setHeader("Access-Control-Allow-Methods", "GET,PUT,POST,OPTIONS");
 }
