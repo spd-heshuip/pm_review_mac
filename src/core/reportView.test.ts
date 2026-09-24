@@ -19,4 +19,11 @@ describe("renderReport", () => {
     expect(view.html).not.toMatch(/"\s+onerror=/);
     expect(view.html).toContain('alt="x&quot; onerror=&quot;alert(1)"');
   });
+
+  it("escapes ampersands in link href exactly once", () => {
+    const view = renderReport("[example](https://example.com?a=1&b=2)");
+    expect(view.html).toContain("&amp;");
+    expect(view.html).not.toContain("&amp;amp;");
+    expect(view.html).toContain('href="https://example.com?a=1&amp;b=2"');
+  });
 });

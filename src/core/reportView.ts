@@ -66,7 +66,7 @@ function sanitizeRenderedHtml(html: string): string {
     const safe = sanitizeUrl(raw);
     if (!safe) return ` ${attr}=""`;
     const quote = dbl !== undefined ? '"' : sgl !== undefined ? "'" : '"';
-    return ` ${attr}=${quote}${escapeHtml(safe)}${quote}`;
+    return ` ${attr}=${quote}${safe}${quote}`;
   });
 }
 
