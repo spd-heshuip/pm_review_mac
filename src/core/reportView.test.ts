@@ -8,4 +8,9 @@ describe("renderReport", () => {
     expect(view.html).toContain("可开发");
     expect(view.html).not.toContain("<script");
   });
+
+  it("strips javascript: links from rendered html", () => {
+    const view = renderReport("[点击](javascript:alert(1))");
+    expect(view.html).not.toContain("javascript:");
+  });
 });
