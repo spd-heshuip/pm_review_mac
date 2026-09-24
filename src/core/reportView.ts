@@ -5,6 +5,22 @@ export interface ReportView {
   toc: Array<{ id: string; text: string; level: number }>;
 }
 
+export function reportPreview(markdown: string, maxLength = 160): string {
+  const plain = markdown
+    .replace(/```[\s\S]*?```/g, "\n")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[[^\]]*]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)]\([^)]*\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/[*_~]/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+  if (plain.length <= maxLength) return plain;
+  return `${plain.slice(0, maxLength).trimEnd()}…`;
+}
+
 export function renderReport(markdown: string): ReportView {
   const toc: ReportView["toc"] = [];
   const marked = new Marked();

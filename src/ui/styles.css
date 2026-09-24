@@ -32,7 +32,8 @@ body {
 
 .settings-card,
 #composer,
-#detail {
+#detail,
+.report-page-card {
   border: 1px solid #dce4da;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.9);
@@ -45,7 +46,8 @@ body {
 }
 
 #composer,
-#detail {
+#detail,
+.report-page-card {
   max-width: 1080px;
   margin: 0 auto 24px;
   padding: 30px;
@@ -253,6 +255,59 @@ button.secondary {
 
 .task-actions textarea {
   flex: 1;
+}
+
+.report-preview {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+  border: 1px solid #dce4da;
+  border-radius: 12px;
+  background: #f7faf6;
+  color: #26312a;
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 400;
+}
+
+.report-preview:hover {
+  border-color: #4e805d;
+  background: #f3f8f3;
+}
+
+.report-preview-label,
+.report-preview-action {
+  color: #245c35;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.report-preview p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #42584a;
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.report-page-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.report-page-heading h2 {
+  margin-bottom: 0;
+}
+
+#report-page .report {
+  margin-top: 8px;
+  border-top: 0;
+  padding-top: 0;
 }
 
 .report {

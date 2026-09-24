@@ -21,7 +21,7 @@ fn main() {
                 "main",
                 WebviewUrl::App(format!("index.html?bridge={port}&token={bridge_token}").into()),
             )
-            .title("需求审查")
+            .title("Lespark需求审查")
             .inner_size(1100.0, 760.0)
             .build()?;
             Ok(())

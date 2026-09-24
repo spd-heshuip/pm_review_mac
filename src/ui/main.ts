@@ -1,4 +1,4 @@
-import { renderReport } from "../core/reportView.js";
+import { renderReport, reportPreview } from "../core/reportView.js";
 import type { TaskRecord } from "../core/taskStore.js";
 import { createTaskPolling } from "./taskPolling.js";
 
@@ -19,6 +19,9 @@ const apiBase = `http://127.0.0.1:${bridgePort}`;
 const settings = element<HTMLElement>("settings");
 const composer = element<HTMLElement>("composer");
 const detail = element<HTMLElement>("detail");
+const reportPage = element<HTMLElement>("report-page");
+const reportPageTitle = element<HTMLElement>("report-page-title");
+const reportPageContent = element<HTMLElement>("report-page-content");
 const settingsForm = element<HTMLFormElement>("settings-form");
 const composerForm = element<HTMLFormElement>("composer-form");
 const taskList = element<HTMLElement>("task-list");
@@ -31,6 +34,8 @@ const updateTaskPolling = createTaskPolling(
   (callback, delay) => window.setInterval(callback, delay),
   (interval) => window.clearInterval(interval as number),
 );
+
+element<HTMLButtonElement>("report-back").addEventListener("click", closeReport);
 
 settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -173,7 +178,7 @@ async function createTaskCard(task: TaskRecord, followUpDraft = ""): Promise<HTM
         markdown = await apiText(`/api/tasks/${encodeURIComponent(task.id)}/report`);
         reportMarkdown.set(task.id, markdown);
       }
-      card.append(createReport(markdown, task));
+      card.append(createReportPreview(markdown, task));
     } catch (error) {
       card.append(messageBlock(errorMessage(error), "error"));
     }
@@ -207,6 +212,39 @@ async function createTaskCard(task: TaskRecord, followUpDraft = ""): Promise<HTM
   }
   if (actions.childElementCount > 0) card.append(actions);
   return card;
+}
+
+function createReportPreview(markdown: string, task: TaskRecord): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "report-preview";
+  const label = document.createElement("span");
+  label.className = "report-preview-label";
+  label.textContent = "审查报告";
+  const excerpt = document.createElement("p");
+  excerpt.textContent = reportPreview(markdown);
+  const action = document.createElement("span");
+  action.className = "report-preview-action";
+  action.textContent = "查看全文";
+  button.append(label, excerpt, action);
+  button.addEventListener("click", () => openReport(markdown, task));
+  return button;
+}
+
+function openReport(markdown: string, task: TaskRecord): void {
+  reportPageTitle.textContent = task.title;
+  reportPageContent.replaceChildren(createReport(markdown, task));
+  composer.hidden = true;
+  detail.hidden = true;
+  reportPage.hidden = false;
+  window.scrollTo(0, 0);
+}
+
+function closeReport(): void {
+  reportPage.hidden = true;
+  reportPageContent.replaceChildren();
+  composer.hidden = false;
+  detail.hidden = false;
 }
 
 function createReport(markdown: string, task: TaskRecord): HTMLElement {

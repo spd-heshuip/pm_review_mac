@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>需求审查</title>
+    <title>Lespark需求审查</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -27,7 +27,7 @@
       <header>
         <div>
           <span class="eyebrow">LesPark · 产品需求</span>
-          <h1>需求审查</h1>
+          <h1>Lespark需求审查</h1>
         </div>
         <span class="connection-state">Cloud Agent 已连接</span>
       </header>
@@ -52,6 +52,19 @@
         <button type="submit">提交审查</button>
         <p class="form-message" id="composer-message" role="alert"></p>
       </form>
+    </section>
+
+    <section id="report-page" hidden>
+      <div class="report-page-card">
+        <div class="report-page-heading">
+          <button id="report-back" class="secondary" type="button">返回</button>
+          <div>
+            <span class="eyebrow">审查报告</span>
+            <h2 id="report-page-title"></h2>
+          </div>
+        </div>
+        <div id="report-page-content"></div>
+      </div>
     </section>
 
     <section id="detail" hidden>
