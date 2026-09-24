@@ -30,12 +30,11 @@ export function renderReport(markdown: string): ReportView {
         const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
         return `<a href="${escapeHtml(safeHref)}"${titleAttr}>${text}</a>`;
       },
-      image({ href, title, text, tokens }) {
+      image({ href, title, text }) {
         const safeSrc = sanitizeUrl(href);
         if (!safeSrc) return escapeHtml(text);
         const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
-        const alt = this.parser.parseInline(tokens);
-        return `<img src="${escapeHtml(safeSrc)}" alt="${alt}"${titleAttr}>`;
+        return `<img src="${escapeHtml(safeSrc)}" alt="${escapeHtml(text)}"${titleAttr}>`;
       },
     },
   });

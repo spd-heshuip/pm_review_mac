@@ -13,4 +13,10 @@ describe("renderReport", () => {
     const view = renderReport("[点击](javascript:alert(1))");
     expect(view.html).not.toContain("javascript:");
   });
+
+  it("escapes alt text in images to prevent attribute injection", () => {
+    const view = renderReport('![x" onerror="alert(1)](https://example.com/a.png)');
+    expect(view.html).not.toMatch(/"\s+onerror=/);
+    expect(view.html).toContain('alt="x&quot; onerror=&quot;alert(1)"');
+  });
 });
