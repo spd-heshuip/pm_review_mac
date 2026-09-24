@@ -28,14 +28,24 @@ export class CursorGateway implements AgentGateway {
 
   async followUp(agentId: string, prompt: string) {
     const agent = await Agent.resume(agentId, { apiKey: this.apiKey });
-    const run = await agent.send(prompt);
-    return { runId: run.id, terminal: this.finish(agent, run) };
+    try {
+      const run = await agent.send(prompt);
+      return { runId: run.id, terminal: this.finish(agent, run) };
+    } catch (error) {
+      await agent[Symbol.asyncDispose]();
+      throw error;
+    }
   }
 
   async reattach(agentId: string, runId: string) {
     const agent = await Agent.resume(agentId, { apiKey: this.apiKey });
-    const run = await Agent.getRun(runId, { runtime: "cloud", agentId, apiKey: this.apiKey });
-    return { runId: run.id, terminal: this.finish(agent, run) };
+    try {
+      const run = await Agent.getRun(runId, { runtime: "cloud", agentId, apiKey: this.apiKey });
+      return { runId: run.id, terminal: this.finish(agent, run) };
+    } catch (error) {
+      await agent[Symbol.asyncDispose]();
+      throw error;
+    }
   }
 
   async cancel(agentId: string, runId: string): Promise<void> {
@@ -56,12 +66,21 @@ export class CursorGateway implements AgentGateway {
     try {
       const result = await run.wait();
       const artifacts = await agent.listArtifacts();
+      const cached = new Map<string, Uint8Array>();
+      for (const artifact of artifacts) {
+        if (!artifact.path.endsWith(".md")) continue;
+        cached.set(artifact.path, new Uint8Array(await agent.downloadArtifact(artifact.path)));
+      }
       return {
         status: result.status,
         assistantText: result.result ?? "",
         artifacts: artifacts.map((artifact) => ({ path: artifact.path, updatedAt: artifact.updatedAt })),
         gitBranches: (result.git?.branches ?? []).flatMap((branch) => (branch.branch ? [branch.branch] : [])),
-        readArtifact: async (path: string) => new Uint8Array(await agent.downloadArtifact(path)),
+        readArtifact: async (path: string) => {
+          const bytes = cached.get(path);
+          if (!bytes) throw new Error(`Artifact not cached: ${path}`);
+          return bytes;
+        },
       };
     } finally {
       await agent[Symbol.asyncDispose]();
